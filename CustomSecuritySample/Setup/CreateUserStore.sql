@@ -12,16 +12,13 @@
   PARTICULAR PURPOSE.
 *****************************************************************************/
 
-USE master
+USE [master]
 GO
 -- create a database for the security information
-IF EXISTS (SELECT * FROM   master..sysdatabases WHERE  name =
-'UserAccounts')
-  DROP DATABASE UserAccounts
+IF DB_ID('$(DBName)') IS NULL
+	CREATE DATABASE [$(DBName)]
 GO
-CREATE DATABASE UserAccounts
-GO
-USE UserAccounts
+USE [$(DBName)]
 GO
 CREATE TABLE [Users] (
   [UserName] [varchar] (255) NOT NULL ,
@@ -33,24 +30,32 @@ CREATE TABLE [Users] (
   )  ON [PRIMARY] 
 ) ON [PRIMARY]
 GO
--- create a stored procedure to register user details
-CREATE PROCEDURE RegisterUser
-@userName varchar(255),
-@passwordHash varchar(50),
-@salt varchar(10)
-AS
-INSERT INTO Users VALUES(@userName, @passwordHash, @salt)
+IF OBJECT_ID('RegisterUser','P') IS NULL
+	EXEC(N'CREATE PROCEDURE RegisterUser AS RETURN 0;')
 GO
--- create a stored procedure to retrieve user details
-CREATE PROCEDURE LookupUser
-@userName varchar(255)
+-- stored procedure to register user details
+ALTER PROCEDURE RegisterUser
+	@userName varchar(255),
+	@passwordHash varchar(50),
+	@salt varchar(10)
 AS
-SELECT PasswordHash, salt 
-FROM Users
-WHERE UserName = @userName
+	INSERT INTO Users VALUES(@userName, @passwordHash, @salt)
+GO
+IF OBJECT_ID('LookupUser','P') IS NULL
+	EXEC(N'CREATE PROCEDURE LookupUser AS RETURN 0;')
+GO
+-- stored procedure to retrieve user details
+ALTER PROCEDURE LookupUser
+	@userName varchar(255)
+AS
+	SELECT PasswordHash, salt 
+	FROM Users
+	WHERE UserName = @userName
 GO
 
 
+USE [$(DBName)]
+GO
 --
 -- Start security grants
 --
@@ -59,6 +64,7 @@ GO
 -- the correct windows account to grant access to for the objects 
 -- defined in this file.  This enables ASP.NET programs to access 
 -- these objects.
+IF OBJECT_ID('tempdb..#GetVersionValues') IS NOT NULL DROP TABLE #GetVersionValues;
 CREATE TABLE #GetVersionValues
 (
 	[Index]	int,
@@ -104,13 +110,14 @@ exec ('grant execute on LookupUser to [' + @ASPUserName + ']');
 exec ('grant execute on RegisterUser to [' + @ASPUserName + ']');
 
 
--- Virtual Service Account for PBI RS
-CREATE USER [NT SERVICE\PowerBIReportServer] FOR LOGIN [NT SERVICE\PowerBIReportServer] 
+BEGIN TRY
+	-- Virtual Service Account for PBI RS
+	CREATE USER [NT SERVICE\PowerBIReportServer] FOR LOGIN [NT SERVICE\PowerBIReportServer] 
 
--- Grant execute permissions to the LookupUser and RegisterUser stored procs
-exec ('grant execute on LookupUser to [NT SERVICE\PowerBIReportServer]');
-exec ('grant execute on RegisterUser to [NT SERVICE\PowerBIReportServer]');
-
-
-
-
+	-- Grant execute permissions to the LookupUser and RegisterUser stored procs
+	exec ('grant execute on LookupUser to [NT SERVICE\PowerBIReportServer]');
+	exec ('grant execute on RegisterUser to [NT SERVICE\PowerBIReportServer]');
+END TRY
+BEGIN CATCH
+	PRINT N'Error while creating user and login for NT SERVICE\PowerBIReportServer: ' + ERROR_MESSAGE()
+END CATCH
