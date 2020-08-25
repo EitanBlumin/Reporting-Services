@@ -52,13 +52,13 @@ namespace Microsoft.Samples.ReportingServices.CustomSecurity
 
       private void Page_Load(object sender, System.EventArgs e)
       {
-			// Design decision: 
-			// * When the request comes with a query string (returnUrl), we log the user in anonymously and automatically.
-			// * When the request comes without a query string, we show the logon page.
-			if (Request.QueryString.HasKeys())
-			{
-				FormsAuthentication.RedirectFromLoginPage(Properties.Settings.Default.AnonymousUser, false);
-			}
+            // Design decision: 
+            // * When the request comes with a query string (returnUrl), we log the user in anonymously and automatically.
+            // * When the request comes without a query string, we show the logon page.
+            if (Request.QueryString.HasKeys())
+            {
+                FormsAuthentication.RedirectFromLoginPage(Properties.Settings.Default.AnonymousUser, false);
+            }
       }
 
       #region Web Form Designer generated code
